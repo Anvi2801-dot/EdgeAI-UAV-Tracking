@@ -25,20 +25,18 @@ int main() {
         std::string videoPath = "../test_videos/test1.mov";
         std::cout << "[Pipeline] Initializing playback file: " << videoPath << std::endl;
         camera = std::make_unique<Capture>(videoPath);
-    }
-    else {
+    } else {
         std::cout << "[Pipeline] Initializing live webcam context [0]" << std::endl;
         camera = std::make_unique<Capture>(0);
     }
 
     Detector detector("../models/yolov8n.onnx");
 
-    // ── Tracker (swap ByteTracker → BotSortTracker here if needed) ──
     std::unique_ptr<Tracker> tracker = std::make_unique<ByteTracker>(
-        0.5f,   // high confidence threshold
+        0.4f,   // high confidence threshold
         0.1f,   // low confidence threshold
-        0.5f,   // IOU match threshold
-        90      // max lost frames before track removed
+        0.3f,   // IOU match threshold
+        60      // max lost frames before track removed
     );
 
     Commander droneCommander;
@@ -54,6 +52,10 @@ int main() {
     bool target_ever_seen = false;
     const double NO_TARGET_TIMEOUT_SEC = 10.0;
 
+    // ── Window setup — outside loop so it only runs once ──
+    cv::namedWindow("UAV - Onboard AI Stream", cv::WINDOW_NORMAL);
+    cv::resizeWindow("UAV - Onboard AI Stream", 1280, 800);
+
     while (true) {
         cv::Mat frame = camera->getFrame();
 
@@ -66,8 +68,7 @@ int main() {
                 std::cout << "[Pipeline] End of testing file reached. Restarting video track loop..." << std::endl;
                 camera->resetPlayback();
                 continue;
-            }
-            else {
+            } else {
                 std::cerr << "[Pipeline Warning] Empty frame caught. Re-buffering..." << std::endl;
                 cv::waitKey(33);
                 continue;
@@ -88,10 +89,8 @@ int main() {
         float inferenceTime = duration.count();
         float fps = 1000.0f / inferenceTime;
 
-        // ── ByteTrack update ──
         std::vector<Track> tracks = tracker->update(detections, frame);
 
-        // Pick the first actively tracked person
         Track* target = nullptr;
         for (auto& t : tracks) {
             if (t.class_id == 0 && t.state != TrackState::Removed) {
@@ -104,7 +103,6 @@ int main() {
             last_target_seen = std::chrono::steady_clock::now();
             target_ever_seen = true;
 
-            // Draw bounding box and track ID
             cv::rectangle(frame, target->box, cv::Scalar(0, 255, 0), 2);
             cv::circle(frame, target->getCenter(), 5, cv::Scalar(0, 0, 255), -1);
             cv::putText(frame,
@@ -118,11 +116,16 @@ int main() {
             );
 
             std::cout << cmdLog << std::endl;
-            cv::putText(frame, cmdLog, cv::Point(30, 50),
-                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
+            size_t splitPos = cmdLog.find('|', cmdLog.find('|') + 1);
+            std::string line1 = cmdLog.substr(0, splitPos);
+            std::string line2 = splitPos != std::string::npos ? cmdLog.substr(splitPos) : "";
 
-        }
-        else {
+            cv::putText(frame, line1, cv::Point(10, 25),
+                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 1);
+            cv::putText(frame, line2, cv::Point(10, 45),
+                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 1);
+
+        } else {
             droneCommander.processTarget(
                 cv::Point(frameW / 2, frameH / 2), -1.0f,
                 frameW, frameH, inferenceTime, fps
@@ -135,8 +138,8 @@ int main() {
 
                 if (remaining <= 0.0) {
                     std::cout << "[AUTO-LAND] No target for "
-                        << (int)NO_TARGET_TIMEOUT_SEC
-                        << "s. Initiating landing..." << std::endl;
+                              << (int)NO_TARGET_TIMEOUT_SEC
+                              << "s. Initiating landing..." << std::endl;
                     cv::destroyAllWindows();
                     droneCommander.triggerLanding();
                     break;
@@ -146,14 +149,12 @@ int main() {
                     + std::to_string((int)remaining + 1) + "s";
                 cv::putText(frame, noTargetText, cv::Point(30, 50),
                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 165, 255), 2);
-            }
-            else {
+            } else {
                 cv::putText(frame, "No Target - Hovering", cv::Point(30, 50),
                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 165, 255), 2);
             }
         }
 
-        // Show active track count
         int active_tracks = 0;
         for (auto& t : tracks)
             if (t.state == TrackState::Tracked || t.state == TrackState::New)
@@ -172,8 +173,7 @@ int main() {
 
         if (key == 'q') {
             break;
-        }
-        else if (key == 'l') {
+        } else if (key == 'l') {
             std::cout << "[MANUAL] Landing key pressed. Initiating landing sequence..." << std::endl;
             cv::destroyAllWindows();
             droneCommander.triggerLanding();

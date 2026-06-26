@@ -61,17 +61,20 @@ std::vector<Track> ByteTracker::update(
     const std::vector<Detection>& detections,
     const cv::Mat& /*frame*/)
 {
+    // Split detections into high and low confidence
     std::vector<Detection> high_dets, low_dets;
     for (auto& d : detections) {
         if (d.confidence >= _high_thresh)      high_dets.push_back(d);
         else if (d.confidence >= _low_thresh)  low_dets.push_back(d);
     }
 
+    // --- Step 1: Predict all tracked positions ---
     std::vector<cv::Rect> predicted_boxes;
     for (auto& t : _tracked) {
         predicted_boxes.push_back(t.kalman.predict());
     }
 
+    // --- Step 2: Match high confidence detections to tracked ---
     std::vector<cv::Rect> high_boxes;
     for (auto& d : high_dets) high_boxes.push_back(d.box);
 
@@ -102,6 +105,7 @@ std::vector<Track> ByteTracker::update(
         }
     }
 
+    // --- Step 3: Match low confidence detections to unmatched tracks ---
     std::vector<cv::Rect> low_boxes;
     for (auto& d : low_dets) low_boxes.push_back(d.box);
 
@@ -132,6 +136,7 @@ std::vector<Track> ByteTracker::update(
         }
     }
 
+    // --- Step 4: Handle unmatched tracks → move to lost ---
     std::vector<InternalTrack> still_tracked;
     for (size_t i = 0; i < _tracked.size(); i++) {
         if (!trk_matched[i]) {
@@ -141,21 +146,21 @@ std::vector<Track> ByteTracker::update(
             if (_tracked[i].track.frames_since_update <= _max_lost) {
                 _lost.push_back(_tracked[i]);
             }
-        }
-        else {
+        } else {
             still_tracked.push_back(_tracked[i]);
         }
     }
     _tracked = still_tracked;
 
+    // --- Step 5: Init new tracks from unmatched high-conf detections ---
     for (size_t j = 0; j < high_dets.size(); j++) {
         if (!det_matched[j]) {
             InternalTrack nt;
-            nt.track.id = _next_id++;
-            nt.track.class_id = high_dets[j].class_id;
+            nt.track.id         = _next_id++;
+            nt.track.class_id   = high_dets[j].class_id;
             nt.track.confidence = high_dets[j].confidence;
-            nt.track.box = high_dets[j].box;
-            nt.track.state = TrackState::New;
+            nt.track.box        = high_dets[j].box;
+            nt.track.state      = TrackState::New;
             nt.track.frames_since_update = 0;
             nt.track.hit_streak = 1;
             nt.kalman.init(high_dets[j].box);
@@ -163,11 +168,35 @@ std::vector<Track> ByteTracker::update(
         }
     }
 
+    // --- Step 6: Re-match lost tracks with unmatched high-conf detections ---
+    std::vector<InternalTrack> still_lost;
+    for (auto& lt : _lost) {
+        lt.track.frames_since_update++;
+        cv::Rect pred = lt.kalman.predict();
+        bool rematched = false;
+        for (size_t j = 0; j < high_dets.size(); j++) {
+            if (!det_matched[j] && iou(pred, high_dets[j].box) > 0.2f) {
+                lt.track.box = lt.kalman.update(high_dets[j].box);
+                lt.track.state = TrackState::Tracked;
+                lt.track.frames_since_update = 0;
+                lt.track.hit_streak++;
+                det_matched[j] = true;
+                _tracked.push_back(lt);
+                rematched = true;
+                break;
+            }
+        }
+        if (!rematched) still_lost.push_back(lt);
+    }
+    _lost = still_lost;
+
+    // --- Step 7: Clean up expired lost tracks ---
     _lost.erase(std::remove_if(_lost.begin(), _lost.end(),
         [this](const InternalTrack& t) {
             return t.track.frames_since_update > _max_lost;
         }), _lost.end());
 
+    // Return all active and lost tracks
     std::vector<Track> result;
     for (auto& t : _tracked) result.push_back(t.track);
     for (auto& t : _lost)    result.push_back(t.track);
