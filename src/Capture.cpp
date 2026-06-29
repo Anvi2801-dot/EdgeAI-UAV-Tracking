@@ -1,12 +1,10 @@
 #include "Capture.hpp"
 #include <iostream>
 
-// Hardware Webcam Constructor (Preserving your AVFoundation Mac framework configuration)
 Capture::Capture(int deviceID) : isVideoFile(false) {
-    cap.open(deviceID, cv::CAP_DSHOW);
+    cap.open(deviceID, cv::CAP_AVFOUNDATION);
 }
 
-// 🎯 NEW: Video File Playback Constructor Implementation
 Capture::Capture(const std::string& videoPath) : isVideoFile(true) {
     cap.open(videoPath);
     if (!cap.isOpened()) {
@@ -32,7 +30,6 @@ cv::Mat Capture::getFrame() {
     return frame;
 }
 
-// 🎯 NEW: Resets video track index back to the very first frame
 void Capture::resetPlayback() {
     if (isVideoFile && cap.isOpened()) {
         cap.set(cv::CAP_PROP_POS_FRAMES, 0);

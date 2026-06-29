@@ -14,8 +14,8 @@ BBoxKalmanFilter::BBoxKalmanFilter() : kf(8, 4, 0) {
     kf.measurementMatrix.at<float>(2, 2) = 1;
     kf.measurementMatrix.at<float>(3, 3) = 1;
 
-    cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-2));
-    cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
+    cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-3));
+    cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1.0));
     cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1.0));
 }
 

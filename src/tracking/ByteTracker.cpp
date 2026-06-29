@@ -3,7 +3,7 @@
 #include <limits>
 
 ByteTracker::ByteTracker(float high_thresh, float low_thresh,
-    float match_thresh, int max_lost)
+    float match_thresh, int max_lost, int min_hits)
     : _high_thresh(high_thresh), _low_thresh(low_thresh),
     _match_thresh(match_thresh), _max_lost(max_lost) {
 }
@@ -196,9 +196,26 @@ std::vector<Track> ByteTracker::update(
             return t.track.frames_since_update > _max_lost;
         }), _lost.end());
 
-    // Return all active and lost tracks
+    // Reset ID counter when all tracks gone
+    if (_tracked.empty() && _lost.empty()) {
+        _next_id = 1;
+    }
+
+    // --- Step 8: NMS on tracked boxes to remove duplicates ---
+    std::vector<cv::Rect>  nms_boxes;
+    std::vector<float>     nms_scores;
+    for (auto& t : _tracked) {
+        nms_boxes.push_back(t.track.box);
+        nms_scores.push_back(t.track.confidence);
+    }
+
+    std::vector<int> nms_indices;
+    if (!nms_boxes.empty()) {
+        cv::dnn::NMSBoxes(nms_boxes, nms_scores, 0.3f, 0.5f, nms_indices);
+    }
+
     std::vector<Track> result;
-    for (auto& t : _tracked) result.push_back(t.track);
-    for (auto& t : _lost)    result.push_back(t.track);
+    for (int idx : nms_indices) result.push_back(_tracked[idx].track);
+    for (auto& t : _lost)       result.push_back(t.track);
     return result;
 }

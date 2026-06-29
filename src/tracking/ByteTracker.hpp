@@ -14,7 +14,8 @@ public:
         float high_thresh = 0.5f,   // high confidence threshold
         float low_thresh = 0.1f,   // low confidence threshold
         float match_thresh = 0.8f,   // IOU match threshold
-        int   max_lost = 30      // frames before track removed
+        int   max_lost = 30,      // frames before track removed
+        int _min_hits = 3
     );
 
     std::vector<Track> update(

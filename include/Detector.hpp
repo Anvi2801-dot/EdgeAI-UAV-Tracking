@@ -20,14 +20,17 @@ struct Detection {
 
 class Detector {
 public:
-    Detector(const std::string& modelPath);
+    Detector(const std::string& modelPath, const std::string& namesPath);
     std::vector<Detection> runInference(cv::Mat& frame);
+
+    const std::vector<std::string>& getClassNames() const { return _classNames; }
 
 private:
     cv::dnn::Net net;
+    std::vector<std::string> _classNames;
     const cv::Size inputSize = cv::Size(640, 640);
     const float scoreThreshold = 0.6;
-    const float nmsThreshold = 0.4;
+    const float nmsThreshold = 0.2;
 };
 
 #endif

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <limits>
 #include <vector>
+#include <set>
+#include <sstream>
 
 #include "Capture.hpp"
 #include "Detector.hpp"
@@ -30,13 +32,57 @@ int main() {
         camera = std::make_unique<Capture>(0);
     }
 
-    Detector detector("../models/yolov8n.onnx");
+    Detector detector("../models/yolov8n.onnx", "../models/coco.names");
+    const auto& CLASS_NAMES = detector.getClassNames();
+
+    // ── Detection + Tracking Config ──
+    std::cout << "\n  OBJECT DETECTION CONFIG " << std::endl;
+    std::cout << "Available classes: person, car, dog, cat, laptop, cell phone, book, chair, etc." << std::endl;
+    std::cout << "Enter classes to DETECT (comma separated, or 'all'): ";
+    std::string detectInput;
+    std::getline(std::cin, detectInput);
+
+    std::cout << "Enter class to TRACK/FOLLOW (drone follows this): ";
+    std::string trackInput;
+    std::getline(std::cin, trackInput);
+
+    // Parse detect classes
+    std::set<int> detectClasses;
+    bool detectAll = (detectInput == "all");
+    if (!detectAll) {
+        std::stringstream ss(detectInput);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            token.erase(0, token.find_first_not_of(' '));
+            token.erase(token.find_last_not_of(' ') + 1);
+            for (int i = 0; i < (int)CLASS_NAMES.size(); i++) {
+                if (CLASS_NAMES[i] == token) {
+                    detectClasses.insert(i);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Parse track class
+    int trackClassId = 0; // default person
+    trackInput.erase(0, trackInput.find_first_not_of(' '));
+    trackInput.erase(trackInput.find_last_not_of(' ') + 1);
+    for (int i = 0; i < (int)CLASS_NAMES.size(); i++) {
+        if (CLASS_NAMES[i] == trackInput) {
+            trackClassId = i;
+            break;
+        }
+    }
+
+    std::cout << "[Config] Detecting: " << (detectAll ? "all classes" : detectInput) << std::endl;
+    std::cout << "[Config] Tracking:  " << CLASS_NAMES[trackClassId] << std::endl;
 
     std::unique_ptr<Tracker> tracker = std::make_unique<ByteTracker>(
         0.4f,   // high confidence threshold
-        0.1f,   // low confidence threshold
-        0.3f,   // IOU match threshold
-        60      // max lost frames before track removed
+        0.15f,   // low confidence threshold
+        0.6f,   // IOU match threshold
+        10     // max lost frames before track removed
     );
 
     Commander droneCommander;
@@ -46,15 +92,16 @@ int main() {
         return -1;
     }
 
-    std::cout << "UAV Onboard Perception Engine Active. Press 'q' to quit, 'l' to land." << std::endl;
+    std::cout << "\nUAV Onboard Perception Engine Active. Press 'q' to quit, 'l' to land." << std::endl;
 
     auto last_target_seen = std::chrono::steady_clock::now();
     bool target_ever_seen = false;
     const double NO_TARGET_TIMEOUT_SEC = 10.0;
 
-    // ── Window setup — outside loop so it only runs once ──
     cv::namedWindow("UAV - Onboard AI Stream", cv::WINDOW_NORMAL);
     cv::resizeWindow("UAV - Onboard AI Stream", 1280, 800);
+
+    int lockedTargetId = -1;
 
     while (true) {
         cv::Mat frame = camera->getFrame();
@@ -83,32 +130,101 @@ int main() {
 
         auto start = std::chrono::high_resolution_clock::now();
         std::vector<Detection> detections = detector.runInference(frame);
+
+        // NMS on raw detections to kill duplicates before tracking
+        std::vector<cv::Rect> raw_boxes;
+        std::vector<float> raw_scores;
+        for (auto& d : detections) {
+            raw_boxes.push_back(d.box);
+            raw_scores.push_back(d.confidence);
+        }
+        std::vector<int> nms_idx;
+        cv::dnn::NMSBoxes(raw_boxes, raw_scores, 0.3f, 0.45f, nms_idx);
+
+        std::vector<Detection> nms_detections;
+        for (int idx : nms_idx) nms_detections.push_back(detections[idx]);
+
+
         auto end = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double, std::milli> duration = end - start;
         float inferenceTime = duration.count();
         float fps = 1000.0f / inferenceTime;
 
-        std::vector<Track> tracks = tracker->update(detections, frame);
-
-        Track* target = nullptr;
-        for (auto& t : tracks) {
-            if (t.class_id == 0 && t.state != TrackState::Removed) {
-                target = &t;
-                break;
+        // ── Filter detections by user config ──
+        std::vector<Detection> filtered_detections;
+        for (auto& d : detections) {
+            if (detectAll || detectClasses.count(d.class_id)) {
+                filtered_detections.push_back(d);
             }
         }
 
+        std::vector<Track> tracks = tracker->update(filtered_detections, frame);
+
+        // ── Find drone follow target (lowest ID of track class) ──
+        Track* target = nullptr;
+        int lowest_id = INT_MAX;
+        // First try to find the locked target
+        if (lockedTargetId != -1) {
+            for (auto& t : tracks) {
+                if (t.id == lockedTargetId &&
+                    t.class_id == trackClassId &&
+                    t.state != TrackState::Removed) {
+                    target = &t;
+                    break;
+                }
+            }
+        }
+
+        // If locked target lost, find new lowest ID
+        if (target == nullptr) {
+            int lowest_id = INT_MAX;
+            for (auto& t : tracks) {
+                if (t.class_id == trackClassId &&
+                    t.state != TrackState::Removed &&
+                    t.hit_streak >= 3 &&        // only confirmed tracks
+                    t.id < lowest_id) {
+                    lowest_id = t.id;
+                    target = &t;
+                }
+            }
+            if (target != nullptr) {
+                lockedTargetId = target->id;
+                std::cout << "[Tracker] Locked onto ID:" << lockedTargetId << std::endl;
+            }
+        }
+
+        // ── Draw all tracked objects ──
+        for (auto& t : tracks) {
+            if (t.state == TrackState::Removed || t.state == TrackState::Lost) continue;
+            if (t.hit_streak < 3 && t.state == TrackState::New) continue;
+
+            bool isTarget = (target != nullptr && t.id == target->id);
+
+            cv::Scalar color;
+            if (isTarget)                    color = cv::Scalar(0, 255, 0);    // green — follow target
+            else if (t.class_id == trackClassId) color = cv::Scalar(0, 165, 255); // orange — same class, not target
+            else                             color = cv::Scalar(255, 165, 0);  // blue — other objects
+
+            cv::rectangle(frame, t.box, color, 2);
+
+            std::string className = (t.class_id < (int)CLASS_NAMES.size())
+                ? CLASS_NAMES[t.class_id] : "obj";
+            std::string label = className + " ID:" + std::to_string(t.id);
+
+            cv::putText(frame, label,
+                cv::Point(t.box.x, t.box.y - 10),
+                cv::FONT_HERSHEY_DUPLEX, 0.45, color, 1);
+
+            if (isTarget) {
+                cv::circle(frame, t.getCenter(), 5, cv::Scalar(0, 0, 255), -1);
+            }
+        }
+
+        // ── Commander logic ──
         if (target != nullptr) {
             last_target_seen = std::chrono::steady_clock::now();
             target_ever_seen = true;
-
-            cv::rectangle(frame, target->box, cv::Scalar(0, 255, 0), 2);
-            cv::circle(frame, target->getCenter(), 5, cv::Scalar(0, 0, 255), -1);
-            cv::putText(frame,
-                "ID:" + std::to_string(target->id),
-                cv::Point(target->box.x, target->box.y - 10),
-                cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
 
             std::string cmdLog = droneCommander.processTarget(
                 target->getCenter(), target->getArea(),
@@ -116,14 +232,15 @@ int main() {
             );
 
             std::cout << cmdLog << std::endl;
+
             size_t splitPos = cmdLog.find('|', cmdLog.find('|') + 1);
             std::string line1 = cmdLog.substr(0, splitPos);
             std::string line2 = splitPos != std::string::npos ? cmdLog.substr(splitPos) : "";
 
             cv::putText(frame, line1, cv::Point(10, 25),
-                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 1);
+                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 2);
             cv::putText(frame, line2, cv::Point(10, 45),
-                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 1);
+                cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 0, 255), 2);
 
         } else {
             droneCommander.processTarget(
@@ -147,14 +264,15 @@ int main() {
 
                 std::string noTargetText = "No Target - Landing in "
                     + std::to_string((int)remaining + 1) + "s";
-                cv::putText(frame, noTargetText, cv::Point(30, 50),
+                cv::putText(frame, noTargetText, cv::Point(30, 70),
                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 165, 255), 2);
             } else {
-                cv::putText(frame, "No Target - Hovering", cv::Point(30, 50),
+                cv::putText(frame, "No Target - Hovering", cv::Point(30, 70),
                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 165, 255), 2);
             }
         }
 
+        // ── HUD ──
         int active_tracks = 0;
         for (auto& t : tracks)
             if (t.state == TrackState::Tracked || t.state == TrackState::New)
@@ -162,9 +280,10 @@ int main() {
 
         std::string perfText = "Inference: " + std::to_string((int)inferenceTime)
             + "ms | FPS: " + std::to_string((int)fps)
-            + " | Tracks: " + std::to_string(active_tracks);
-        cv::putText(frame, perfText, cv::Point(30, frameH - 30),
-            cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 255), 2);
+            + " | Tracks: " + std::to_string(active_tracks)
+            + " | Following: " + CLASS_NAMES[trackClassId];
+        cv::putText(frame, perfText, cv::Point(10, frameH - 15),
+            cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 255, 255), 1);
 
         cv::imshow("UAV - Onboard AI Stream", frame);
 

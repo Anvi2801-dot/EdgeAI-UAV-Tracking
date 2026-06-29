@@ -1,0 +1,3 @@
+/Users/anvisinghparihar/uav_workspace/uav/build/CMakeFiles/uav.dir
+/Users/anvisinghparihar/uav_workspace/uav/build/CMakeFiles/edit_cache.dir
+/Users/anvisinghparihar/uav_workspace/uav/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,28 @@
+
+# Consider dependencies only in project.
+set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
+
+# The set of languages for which implicit dependencies are needed:
+set(CMAKE_DEPENDS_LANGUAGES
+  )
+
+# The set of dependency files which are needed:
+set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Capture.cpp" "CMakeFiles/uav.dir/src/Capture.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Capture.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Commander.cpp" "CMakeFiles/uav.dir/src/Commander.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Commander.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Detector.cpp" "CMakeFiles/uav.dir/src/Detector.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Detector.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/main.cpp" "CMakeFiles/uav.dir/src/main.cpp.o" "gcc" "CMakeFiles/uav.dir/src/main.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/tracking/ByteTracker.cpp" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/tracking/KalmanFilter.cpp" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o.d"
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES
+  )
+
+# Fortran module output directory.
+set(CMAKE_Fortran_TARGET_MODULE_DIR "")

@@ -1,10 +1,19 @@
 #include "Detector.hpp"
+#include <fstream>
 
-Detector::Detector(const std::string& modelPath) {
+Detector::Detector(const std::string& modelPath,
+                   const std::string& classNamesPath) {
     net = cv::dnn::readNetFromONNX(modelPath);
     net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
     net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+
+    // Load COCO class names
+    std::ifstream classFile(classNamesPath);
+    std::string line;
+    while (std::getline(classFile, line))
+        if (!line.empty()) _classNames.push_back(line);
 }
+
 
 std::vector<Detection> Detector::runInference(cv::Mat& frame) {
     cv::Mat blob;
