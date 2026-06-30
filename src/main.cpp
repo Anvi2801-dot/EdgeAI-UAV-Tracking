@@ -16,7 +16,8 @@ int main() {
     std::cout << "  UAV PERCEPTION SUITE - SOURCE SELECTION " << std::endl;
     std::cout << " [1] Launch with Live Webcam Feed" << std::endl;
     std::cout << " [2] Run via Pre-recorded Reference Video File" << std::endl;
-    std::cout << "Select input option (1 or 2): ";
+    std::cout << " [3] Run via Image Sequence Folder (e.g. VisDrone)" << std::endl;
+    std::cout << "Select input option (1, 2 or 3): ";
 
     int choice = 1;
     std::cin >> choice;
@@ -27,7 +28,13 @@ int main() {
         std::string videoPath = "../test_videos/test1.mov";
         std::cout << "[Pipeline] Initializing playback file: " << videoPath << std::endl;
         camera = std::make_unique<Capture>(videoPath);
-    } else {
+    } else if (choice == 3) {
+        std::cout << "Enter path to image sequence folder: ";
+        std::string folderPath;
+        std::getline(std::cin, folderPath);
+        std::cout << "[Pipeline] Initializing image sequence: " << folderPath << std::endl;
+        camera = std::make_unique<Capture>(folderPath, true);
+    }else {
         std::cout << "[Pipeline] Initializing live webcam context [0]" << std::endl;
         camera = std::make_unique<Capture>(0);
     }
@@ -132,7 +139,7 @@ int main() {
         }
 
         if (frame.empty()) {
-            if (choice == 2) {
+            if (choice == 2 || choice == 3) {
                 std::cout << "[Pipeline] End of testing file reached. Restarting video track loop..." << std::endl;
                 camera->resetPlayback();
                 continue;

@@ -4,8 +4,14 @@
 Detector::Detector(const std::string& modelPath,
                    const std::string& classNamesPath) {
     net = cv::dnn::readNetFromONNX(modelPath);
+
+#ifdef __linux__
     net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
     net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+#else
+    net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+#endif
 
     // Load COCO class names
     std::ifstream classFile(classNamesPath);

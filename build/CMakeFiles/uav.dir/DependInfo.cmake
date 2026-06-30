@@ -8,12 +8,12 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/Capture.cpp" "CMakeFiles/uav.dir/src/Capture.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Capture.cpp.o.d"
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/Commander.cpp" "CMakeFiles/uav.dir/src/Commander.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Commander.cpp.o.d"
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/Detector.cpp" "CMakeFiles/uav.dir/src/Detector.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Detector.cpp.o.d"
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/main.cpp" "CMakeFiles/uav.dir/src/main.cpp.o" "gcc" "CMakeFiles/uav.dir/src/main.cpp.o.d"
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/tracking/ByteTracker.cpp" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o.d"
-  "/home/nvidia/anvi_ws/uav-autonomous-tracking/src/tracking/KalmanFilter.cpp" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Capture.cpp" "CMakeFiles/uav.dir/src/Capture.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Capture.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Commander.cpp" "CMakeFiles/uav.dir/src/Commander.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Commander.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/Detector.cpp" "CMakeFiles/uav.dir/src/Detector.cpp.o" "gcc" "CMakeFiles/uav.dir/src/Detector.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/main.cpp" "CMakeFiles/uav.dir/src/main.cpp.o" "gcc" "CMakeFiles/uav.dir/src/main.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/tracking/ByteTracker.cpp" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/ByteTracker.cpp.o.d"
+  "/Users/anvisinghparihar/uav_workspace/uav/src/tracking/KalmanFilter.cpp" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o" "gcc" "CMakeFiles/uav.dir/src/tracking/KalmanFilter.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.
