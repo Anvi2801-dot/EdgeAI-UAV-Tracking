@@ -6,7 +6,16 @@
 namespace fs = std::filesystem;
 
 Capture::Capture(int deviceID) : isVideoFile(false) {
+#if defined(__APPLE__)
+    // macOS: Use AVFoundation
+    cap.open(deviceID, cv::CAP_AVFOUNDATION);
+#elif defined(_WIN32)
+    // Windows: Use Media Foundation
+    cap.open(deviceID, cv::CAP_MSMF);
+#else
+    // Linux/Other: Default to V4L2
     cap.open(deviceID, cv::CAP_V4L2);
+#endif
 }
 
 Capture::Capture(const std::string& videoPath) : isVideoFile(true) {
