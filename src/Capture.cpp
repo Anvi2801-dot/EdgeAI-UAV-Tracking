@@ -7,8 +7,12 @@ namespace fs = std::filesystem;
 
 Capture::Capture(int deviceID) : isVideoFile(false) {
     // Try RTSP stream first
-    const std::string rtspUrl = "rtsp://192.168.144.25:8554/main.264";
-    cap.open(rtspUrl, cv::CAP_GSTREAMER);
+    const std::string pipeline = 
+        "rtspsrc location=rtsp://192.168.144.25:8554/main.264 latency=100 protocols=tcp ! "
+        "rtph264depay ! h264parse ! nvv4l2decoder ! nvvidconv ! "
+        "video/x-raw,format=BGRx ! videoconvert ! "
+        "video/x-raw,format=BGR ! appsink drop=1 sync=0";
+cap.open(pipeline, cv::CAP_GSTREAMER);
     
     if (!cap.isOpened()) {
         std::cerr << "[Capture] RTSP stream failed, falling back to device " << deviceID << std::endl;
