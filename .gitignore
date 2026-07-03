@@ -1,4 +1,9 @@
-uav/build/ 
+uav/build/
+/build
+build/
+MAVSDK/
+scripts/
+eval_results.txt 
 bin/
 obj/
 *.o
