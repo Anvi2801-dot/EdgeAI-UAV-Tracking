@@ -10,6 +10,7 @@ find_package(OpenCV REQUIRED)
 
 include_directories(include ${OpenCV_INCLUDE_DIRS})
 
+
 add_executable(uav
     src/main.cpp
     src/Capture.cpp

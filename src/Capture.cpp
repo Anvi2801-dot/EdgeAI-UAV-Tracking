@@ -6,16 +6,22 @@
 namespace fs = std::filesystem;
 
 Capture::Capture(int deviceID) : isVideoFile(false) {
+    // Try RTSP stream first
+    const std::string rtspUrl = "rtsp://192.168.144.25:8554/main.264";
+    cap.open(rtspUrl, cv::CAP_GSTREAMER);
+    
+    if (!cap.isOpened()) {
+        std::cerr << "[Capture] RTSP stream failed, falling back to device " << deviceID << std::endl;
 #if defined(__APPLE__)
-    // macOS: Use AVFoundation
-    cap.open(deviceID, cv::CAP_AVFOUNDATION);
+        cap.open(deviceID, cv::CAP_AVFOUNDATION);
 #elif defined(_WIN32)
-    // Windows: Use Media Foundation
-    cap.open(deviceID, cv::CAP_MSMF);
+        cap.open(deviceID, cv::CAP_MSMF);
 #else
-    // Linux/Other: Default to V4L2
-    cap.open(deviceID, cv::CAP_V4L2);
+        cap.open(deviceID, cv::CAP_V4L2);
 #endif
+    } else {
+        std::cout << "[Capture] RTSP stream opened successfully." << std::endl;
+    }
 }
 
 Capture::Capture(const std::string& videoPath) : isVideoFile(true) {
