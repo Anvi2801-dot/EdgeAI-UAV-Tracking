@@ -34,5 +34,15 @@ env/
 __pycache__/
 PX4-Autopilot/
 
-# Ignore test videos
 test_videos/MAVSDK/
+
+scripts/runs/
+
+visdrone_yolo/
+
+scripts/results_*.txt
+
+scripts/output.csv
+output.csv
+
+scripts/__pycache__/

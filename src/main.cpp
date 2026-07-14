@@ -106,7 +106,7 @@ int main() {
         0.4f,   // high confidence threshold
         0.15f,  // low confidence threshold
         0.6f,   // IOU match threshold
-        10      // max lost frames before track removed
+        40      // max lost frames before track removed
     );
 
     // Only init Commander in tracking mode

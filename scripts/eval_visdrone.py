@@ -6,11 +6,14 @@ with VisDrone -> COCO class mapping.
 Usage:
     python3 eval_visdrone.py --dataset /home/nvidia/VisDrone2019-VID-test-dev \
                               --model /path/to/yolov8n.pt \
-                              --sequences uav0000009_03358_v uav0000073_00600_v
+                              --sequences uav0000009_03358_v uav0000073_00600_v \
+                              --conf 0.25 --iou 0.5 \
+                              --output results_conf25_iou50.txt
 """
 
 import argparse
 import os
+import sys
 from pathlib import Path
 from collections import defaultdict
 
@@ -31,8 +34,6 @@ VISDRONE_TO_COCO = {
     10: 3,  # motor -> motorcycle
     # 0, 7, 8 have no COCO equivalent -> skipped
 }
-
-IOU_THRESHOLD = 0.5
 
 
 def load_visdrone_annotations(txt_path):
@@ -85,12 +86,12 @@ def iou(boxA, boxB):
     return inter_area / union if union > 0 else 0
 
 
-def evaluate_sequence(model, dataset_path, seq_name):
+def evaluate_sequence(model, dataset_path, seq_name, conf_threshold, iou_threshold, out):
     seq_dir = Path(dataset_path) / "sequences" / seq_name
     ann_path = Path(dataset_path) / "annotations" / f"{seq_name}.txt"
 
     if not seq_dir.exists() or not ann_path.exists():
-        print(f"[Skip] Missing data for sequence: {seq_name}")
+        log(f"[Skip] Missing data for sequence: {seq_name}", out)
         return None
 
     frame_gt = load_visdrone_annotations(ann_path)
@@ -108,7 +109,7 @@ def evaluate_sequence(model, dataset_path, seq_name):
         if frame is None:
             continue
 
-        results = model.predict(frame, verbose=False, conf=0.25)[0]
+        results = model.predict(frame, verbose=False, conf=conf_threshold)[0]
 
         pred_boxes = []
         for box in results.boxes:
@@ -128,7 +129,7 @@ def evaluate_sequence(model, dataset_path, seq_name):
                     best_iou = score
                     best_idx = idx
 
-            if best_iou >= IOU_THRESHOLD:
+            if best_iou >= iou_threshold:
                 total_tp += 1
                 matched_gt.add(best_idx)
             else:
@@ -140,42 +141,73 @@ def evaluate_sequence(model, dataset_path, seq_name):
     recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
-    print(f"\n[{seq_name}] frames={len(frame_files)} TP={total_tp} FP={total_fp} FN={total_fn}")
-    print(f"[{seq_name}] Precision={precision:.3f} Recall={recall:.3f} F1={f1:.3f}")
+    log(f"\n[{seq_name}] frames={len(frame_files)} TP={total_tp} FP={total_fp} FN={total_fn}", out)
+    log(f"[{seq_name}] Precision={precision:.3f} Recall={recall:.3f} F1={f1:.3f}", out)
 
     return {"tp": total_tp, "fp": total_fp, "fn": total_fn}
 
 
+def log(msg, out):
+    """Print to stdout and optionally to output file."""
+    print(msg)
+    if out:
+        out.write(msg + "\n")
+        out.flush()
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", required=True, help="Path to VisDrone2019-VID-test-dev folder")
-    parser.add_argument("--model", required=True, help="Path to yolov8n.pt")
-    parser.add_argument("--sequences", nargs="+", required=False, default=None, help="Sequence names to evaluate (omit to run all)")
+    parser.add_argument("--dataset",   required=True,               help="Path to VisDrone2019-VID-test-dev folder")
+    parser.add_argument("--model",     required=True,               help="Path to yolov8n.pt")
+    parser.add_argument("--sequences", nargs="+", default=None,     help="Sequence names to evaluate (omit to run all)")
+    parser.add_argument("--conf",      type=float, default=0.25,    help="Detection confidence threshold (default: 0.25)")
+    parser.add_argument("--iou",       type=float, default=0.3,     help="IoU matching threshold (default: 0.3)")
+    parser.add_argument("--output",    default=None,                help="Optional path to save results as a text file")
     args = parser.parse_args()
 
     model = YOLO(args.model)
 
+    out_file = open(args.output, "w") if args.output else None
+
+    # Log run config
+    header = (
+        f"===== RUN CONFIG =====\n"
+        f"model:  {args.model}\n"
+        f"conf:   {args.conf}\n"
+        f"iou:    {args.iou}\n"
+        f"output: {args.output or 'stdout only'}\n"
+    )
+    log(header, out_file)
+
     overall = {"tp": 0, "fp": 0, "fn": 0}
+
     if args.sequences:
         sequences = args.sequences
     else:
         sequences = sorted(os.listdir(os.path.join(args.dataset, "sequences")))
-        print(f"[Info] Running on all {len(sequences)} sequences...")
+        log(f"[Info] Running on all {len(sequences)} sequences...", out_file)
 
     for seq in sequences:
-        result = evaluate_sequence(model, args.dataset, seq)
+        result = evaluate_sequence(model, args.dataset, seq, args.conf, args.iou, out_file)
         if result:
             overall["tp"] += result["tp"]
             overall["fp"] += result["fp"]
             overall["fn"] += result["fn"]
 
     precision = overall["tp"] / (overall["tp"] + overall["fp"]) if (overall["tp"] + overall["fp"]) > 0 else 0
-    recall = overall["tp"] / (overall["tp"] + overall["fn"]) if (overall["tp"] + overall["fn"]) > 0 else 0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    recall    = overall["tp"] / (overall["tp"] + overall["fn"]) if (overall["tp"] + overall["fn"]) > 0 else 0
+    f1        = 2 * precision * recall / (precision + recall)   if (precision + recall) > 0           else 0
 
-    print(f"\n===== OVERALL =====")
-    print(f"TP={overall['tp']} FP={overall['fp']} FN={overall['fn']}")
-    print(f"Precision={precision:.3f} Recall={recall:.3f} F1={f1:.3f}")
+    summary = (
+        f"\n===== OVERALL =====\n"
+        f"TP={overall['tp']} FP={overall['fp']} FN={overall['fn']}\n"
+        f"Precision={precision:.3f} Recall={recall:.3f} F1={f1:.3f}"
+    )
+    log(summary, out_file)
+
+    if out_file:
+        out_file.close()
+        print(f"\n[Saved] Results written to: {args.output}")
 
 
 if __name__ == "__main__":

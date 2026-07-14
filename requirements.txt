@@ -1,0 +1,11 @@
+# Python dependencies for UAV autonomous tracking project
+# Install with: pip3 install -r requirements.txt
+
+# YOLOv8 — detection, training, export
+ultralytics>=8.4.90
+
+# Computer vision
+opencv-python>=4.8.0
+
+# Numerical
+numpy>=1.23.0

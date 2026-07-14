@@ -29,8 +29,8 @@ private:
     cv::dnn::Net net;
     std::vector<std::string> _classNames;
     const cv::Size inputSize = cv::Size(640, 640);
-    const float scoreThreshold = 0.6;
-    const float nmsThreshold = 0.2;
+    const float scoreThreshold = 0.25;
+    const float nmsThreshold = 0.45;
 };
 
 #endif
