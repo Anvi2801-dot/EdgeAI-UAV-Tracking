@@ -6,6 +6,21 @@ This document covers the full evaluation and finetuning analysis of YOLOv8n on t
 
 ---
 
+## Summary
+
+- **Model:** YOLOv8n finetuned on VisDrone2019-VID (56 train sequences, 7 val sequences)
+- **Training:** 50 epochs, 48.3 hours on Apple M3 Pro (MPS), best weights at epoch 7
+- **Overfitting:** Val loss diverged from train loss at epoch 7 — root cause is insufficient dataset diversity (56 sequences)
+- **Best overall F1:** 0.533 at conf=0.25, iou=0.3 — 52% improvement over baseline (0.351)
+- **Recall improvement:** +69% over baseline (0.237 → 0.401 at standard conf=0.25, iou=0.5)
+- **Best classes:** Person (AP=0.571) and Car (AP=0.562) — only two classes worth targeting
+- **Failed classes:** Truck (AP=0.000), Motorcycle (AP=0.212), Bicycle (AP=0.216) — too few instances or too confused with other classes
+- **Dominant failure mode:** Background miss rate — 39% of persons and 51% of cars missed as background
+- **Recommended C++ parameters:** `scoreThreshold=0.25`, `nmsThreshold=0.45`
+- **Possible future improvement:** Train on VisDrone-DET dataset too with only 2 classes- person and car
+
+---
+
 ## Dataset
 
 | Split | Source | Sequences | Frames |
