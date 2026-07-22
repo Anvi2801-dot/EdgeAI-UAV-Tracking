@@ -46,3 +46,4 @@ scripts/output.csv
 output.csv
 
 scripts/__pycache__/
+*.mp4

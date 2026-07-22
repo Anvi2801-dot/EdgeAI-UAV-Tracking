@@ -25,7 +25,7 @@ int main() {
 
     std::unique_ptr<Capture> camera;
     if (choice == 2) {
-        std::string videoPath = "../test_videos/test1.mov";
+        std::string videoPath = "/Users/anvisinghparihar/Downloads/REC_0009.mp4";
         std::cout << "[Pipeline] Initializing playback file: " << videoPath << std::endl;
         camera = std::make_unique<Capture>(videoPath);
     } else if (choice == 3) {
@@ -34,12 +34,12 @@ int main() {
         std::getline(std::cin, folderPath);
         std::cout << "[Pipeline] Initializing image sequence: " << folderPath << std::endl;
         camera = std::make_unique<Capture>(folderPath, true);
-    }else {
+    } else {
         std::cout << "[Pipeline] Initializing live webcam context [0]" << std::endl;
         camera = std::make_unique<Capture>(0);
     }
 
-    Detector detector("../models/yolov8n.onnx", "../models/coco.names");
+    Detector detector("../models/best.onnx", "../models/best.names");
     const auto& CLASS_NAMES = detector.getClassNames();
 
     // ── Mode Selection ──
@@ -55,7 +55,7 @@ int main() {
     // ── Detection + Tracking Config ──
     std::cout << "\n  OBJECT DETECTION CONFIG " << std::endl;
     std::cout << "Available classes: person, car, dog, cat, laptop, cell phone, book, chair, etc." << std::endl;
-    std::cout << "Enter classes to (comma separated, or 'all'): ";
+    std::cout << "Enter classes to detect (comma separated, or 'all'): ";
     std::string detectInput;
     std::getline(std::cin, detectInput);
 
@@ -105,8 +105,8 @@ int main() {
     std::unique_ptr<Tracker> tracker = std::make_unique<ByteTracker>(
         0.4f,   // high confidence threshold
         0.15f,  // low confidence threshold
-        0.6f,   // IOU match threshold
-        40      // max lost frames before track removed
+        0.5f,   // IOU match threshold — slightly lenient for reappearing objects
+        80      // max lost frames — ~4-5s at 17fps for occlusion memory
     );
 
     // Only init Commander in tracking mode
@@ -124,12 +124,14 @@ int main() {
 
     auto last_target_seen = std::chrono::steady_clock::now();
     bool target_ever_seen = false;
-    const double NO_TARGET_TIMEOUT_SEC = 10.0;
+    const double NO_TARGET_TIMEOUT_SEC = 20.0;
 
     cv::namedWindow("UAV - Onboard AI Stream", cv::WINDOW_NORMAL);
     cv::resizeWindow("UAV - Onboard AI Stream", 1280, 800);
 
     int lockedTargetId = -1;
+    int lockedTargetLostFrames = 0;
+    const int SWITCH_TARGET_GRACE_FRAMES = 30; // ~1.5s at 17fps before switching target
 
     while (true) {
         cv::Mat frame = camera->getFrame();
@@ -153,8 +155,11 @@ int main() {
         int frameW = frame.cols;
         int frameH = frame.rows;
 
-        cv::line(frame, cv::Point(frameW / 2 - 100, 0), cv::Point(frameW / 2 - 100, frameH), cv::Scalar(255, 0, 0), 1);
-        cv::line(frame, cv::Point(frameW / 2 + 100, 0), cv::Point(frameW / 2 + 100, frameH), cv::Scalar(255, 0, 0), 1);
+        // Only draw centre guide lines in tracking mode
+        if (mode == 3) {
+            cv::line(frame, cv::Point(frameW / 2 - 100, 0), cv::Point(frameW / 2 - 100, frameH), cv::Scalar(255, 0, 0), 1);
+            cv::line(frame, cv::Point(frameW / 2 + 100, 0), cv::Point(frameW / 2 + 100, frameH), cv::Scalar(255, 0, 0), 1);
+        }
 
         auto start = std::chrono::high_resolution_clock::now();
         std::vector<Detection> detections = detector.runInference(frame);
@@ -188,14 +193,16 @@ int main() {
         // ── Mode 1 & 2: draw detections directly, no tracker, no drone ──
         if (mode == 1 || mode == 2) {
             for (auto& d : filtered_detections) {
-                cv::rectangle(frame, d.box, cv::Scalar(0, 255, 0), 2);
+                // Person always blue, all others green
+                cv::Scalar boxColor = (d.class_id == 0) ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 255, 0);
+                cv::rectangle(frame, d.box, boxColor, 2);
                 if (mode == 2) {
                     std::string className = (d.class_id < (int)CLASS_NAMES.size())
                         ? CLASS_NAMES[d.class_id] : "obj";
                     std::string label = className + " " + std::to_string((int)(d.confidence * 100)) + "%";
                     cv::putText(frame, label,
                         cv::Point(d.box.x, d.box.y - 10),
-                        cv::FONT_HERSHEY_DUPLEX, 0.45, cv::Scalar(0, 255, 0), 1);
+                        cv::FONT_HERSHEY_DUPLEX, 0.45, boxColor, 1);
                 }
             }
 
@@ -216,7 +223,7 @@ int main() {
         // ── Mode 3: full tracking + drone pipeline ──
         std::vector<Track> tracks = tracker->update(filtered_detections, frame);
 
-        // Find drone follow target (lowest ID of track class)
+        // Find locked target first
         Track* target = nullptr;
         if (lockedTargetId != -1) {
             for (auto& t : tracks) {
@@ -229,21 +236,30 @@ int main() {
             }
         }
 
+        // If locked target not found, apply grace period before switching
         if (target == nullptr) {
-            int lowest_id = INT_MAX;
-            for (auto& t : tracks) {
-                if (t.class_id == trackClassId &&
-                    t.state != TrackState::Removed &&
-                    t.hit_streak >= 3 &&
-                    t.id < lowest_id) {
-                    lowest_id = t.id;
-                    target = &t;
+            lockedTargetLostFrames++;
+
+            if (lockedTargetLostFrames >= SWITCH_TARGET_GRACE_FRAMES || lockedTargetId == -1) {
+                int lowest_id = INT_MAX;
+                for (auto& t : tracks) {
+                    if (t.class_id == trackClassId &&
+                        t.state != TrackState::Removed &&
+                        t.hit_streak >= 3 &&
+                        t.id < lowest_id) {
+                        lowest_id = t.id;
+                        target = &t;
+                    }
+                }
+                if (target != nullptr) {
+                    if (lockedTargetId != target->id)
+                        std::cout << "[Tracker] Switched to ID:" << target->id << std::endl;
+                    lockedTargetId = target->id;
+                    lockedTargetLostFrames = 0;
                 }
             }
-            if (target != nullptr) {
-                lockedTargetId = target->id;
-                std::cout << "[Tracker] Locked onto ID:" << lockedTargetId << std::endl;
-            }
+        } else {
+            lockedTargetLostFrames = 0; // reset when target is found
         }
 
         // Draw all tracked objects
@@ -254,9 +270,9 @@ int main() {
             bool isTarget = (target != nullptr && t.id == target->id);
 
             cv::Scalar color;
-            if (isTarget)                        color = cv::Scalar(0, 255, 0);
-            else if (t.class_id == trackClassId) color = cv::Scalar(0, 165, 255);
-            else                                 color = cv::Scalar(255, 165, 0);
+            if (t.class_id == 0)   color = cv::Scalar(255, 0, 0);   // person always blue
+            else if (isTarget)     color = cv::Scalar(0, 255, 0);    // non-person target green
+            else                   color = cv::Scalar(255, 165, 0);  // others orange
 
             cv::rectangle(frame, t.box, color, 2);
 

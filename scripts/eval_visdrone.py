@@ -21,18 +21,12 @@ import cv2
 from ultralytics import YOLO
 
 # ── VisDrone class ID -> COCO class ID mapping ──
-# VisDrone classes: 0=ignored,1=pedestrian,2=people,3=bicycle,4=car,5=van,
-#                    6=truck,7=tricycle,8=awning-tricycle,9=bus,10=motor
+
 VISDRONE_TO_COCO = {
     1: 0,   # pedestrian -> person
     2: 0,   # people -> person
-    3: 1,   # bicycle -> bicycle
-    4: 2,   # car -> car
-    5: 2,   # van -> car
-    6: 7,   # truck -> truck
-    9: 5,   # bus -> bus
-    10: 3,  # motor -> motorcycle
-    # 0, 7, 8 have no COCO equivalent -> skipped
+    4: 1,   # car -> car
+    5: 1,   # van -> car
 }
 
 

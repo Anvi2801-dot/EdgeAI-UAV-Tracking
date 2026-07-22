@@ -12,7 +12,7 @@ Commander::Commander() : state(GROUNDED), last_errorX(0.0f), last_errorArea(0.0f
     mavsdk::Mavsdk::Configuration config(mavsdk::ComponentType::CompanionComputer);
     _mavsdk = std::make_unique<mavsdk::Mavsdk>(config);
 
-    mavsdk::ConnectionResult connection_result = _mavsdk->add_any_connection("udpout://192.168.110.141:14580");
+    mavsdk::ConnectionResult connection_result = _mavsdk->add_any_connection("udpin://0.0.0.0:14540");
     if (connection_result != mavsdk::ConnectionResult::Success) {
         std::cerr << "[MAVSDK Error] Connection to vehicle failed!" << std::endl;
         return;

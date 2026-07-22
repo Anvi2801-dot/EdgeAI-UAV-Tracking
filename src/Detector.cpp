@@ -40,7 +40,7 @@ std::vector<Detection> Detector::runInference(cv::Mat& frame) {
     float* data = (float*)output.data;
     for (int i = 0; i < output.rows; ++i) {
         float* classes_scores = data + 4;
-        cv::Mat scores(1, 80, CV_32FC1, classes_scores);
+        cv::Mat scores(1, (int)_classNames.size(), CV_32FC1, classes_scores);
         cv::Point class_id_point;
         double max_class_score;
         cv::minMaxLoc(scores, 0, &max_class_score, 0, &class_id_point);
@@ -56,7 +56,7 @@ std::vector<Detection> Detector::runInference(cv::Mat& frame) {
             confidences.push_back(max_class_score);
             boxes.push_back(cv::Rect(left, top, width, height));
         }
-        data += 84;
+        data += 4 + (int)_classNames.size();
     }
 
     std::vector<int> indices;
