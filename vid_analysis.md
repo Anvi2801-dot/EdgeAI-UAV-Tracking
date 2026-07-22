@@ -8,7 +8,7 @@
 | Duration | ~1:49 mins |
 | Total frames | 2,709 |
 | Video FPS | 25.0 |
-| Model | YOLOv8n finetuned (Run 2) — 2 classes |
+| Model | YOLOv8n finetuned — 2 classes |
 | Confidence threshold | 0.25 |
 | Hardware | Mac M3 Pro (CPU inference) |
 
@@ -16,7 +16,7 @@
 
 ## Inference Performance
 
-| Metric | Classification (Mode 2) | Tracking (Mode 3) |
+| Metric | Classification | Tracking |
 |---|---|---|
 | Avg inference | 23.5ms | 23.8ms |
 | Avg FPS | 42.5 | 42.1 |
@@ -27,7 +27,7 @@
 
 ## Detection Counts
 
-| Class | Mode 2 (Classification) | Mode 3 (Tracking) |
+| Class | Classification | Tracking |
 |---|---|---|
 | Person — total detections | 3,865 | 1,781 |
 | Person — avg confidence | 0.439 | 0.546 |
@@ -38,7 +38,7 @@
 
 ---
 
-## Tracking Analytics (Mode 3)
+## Tracking Analytics 
 
 | Metric | Value |
 |---|---|
