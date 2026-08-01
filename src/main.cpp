@@ -25,7 +25,7 @@ int main() {
 
     std::unique_ptr<Capture> camera;
     if (choice == 2) {
-        std::string videoPath = "/Users/anvisinghparihar/Downloads/REC_0009.mp4";
+        std::string videoPath = "/Users/anvisinghparihar/uav_workspace/uav/REC_0009.mp4";
         std::cout << "[Pipeline] Initializing playback file: " << videoPath << std::endl;
         camera = std::make_unique<Capture>(videoPath);
     } else if (choice == 3) {
@@ -39,7 +39,12 @@ int main() {
         camera = std::make_unique<Capture>(0);
     }
 
-    Detector detector("../models/best.onnx", "../models/best.names");
+    // Finetuned (2-class model):
+    //Detector detector("../models/best.onnx", "../models/best.names");
+
+    // Pretrained (10-class model remapped to 2):
+    Detector detector("../models/yolov8n-visdrone.onnx", "../models/visdrone.names", 10);
+
     const auto& CLASS_NAMES = detector.getClassNames();
 
     // ── Mode Selection ──
@@ -131,7 +136,7 @@ int main() {
 
     int lockedTargetId = -1;
     int lockedTargetLostFrames = 0;
-    const int SWITCH_TARGET_GRACE_FRAMES = 30; // ~1.5s at 17fps before switching target
+    const int SWITCH_TARGET_GRACE_FRAMES = 120; 
 
     while (true) {
         cv::Mat frame = camera->getFrame();

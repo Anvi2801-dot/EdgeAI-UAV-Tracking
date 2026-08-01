@@ -2,7 +2,8 @@
 #include <fstream>
 
 Detector::Detector(const std::string& modelPath,
-                   const std::string& classNamesPath) {
+                   const std::string& classNamesPath,
+                   int numModelClasses) {
     net = cv::dnn::readNetFromONNX(modelPath);
 
 #ifdef __linux__
@@ -13,11 +14,13 @@ Detector::Detector(const std::string& modelPath,
     net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 #endif
 
-    // Load COCO class names
     std::ifstream classFile(classNamesPath);
     std::string line;
     while (std::getline(classFile, line))
         if (!line.empty()) _classNames.push_back(line);
+
+    // If numModelClasses not specified, use names file size
+    _numModelClasses = (numModelClasses > 0) ? numModelClasses : (int)_classNames.size();
 }
 
 
@@ -40,7 +43,9 @@ std::vector<Detection> Detector::runInference(cv::Mat& frame) {
     float* data = (float*)output.data;
     for (int i = 0; i < output.rows; ++i) {
         float* classes_scores = data + 4;
-        cv::Mat scores(1, (int)_classNames.size(), CV_32FC1, classes_scores);
+
+        // Use _numModelClasses for inference (actual model output size)
+        cv::Mat scores(1, _numModelClasses, CV_32FC1, classes_scores);
         cv::Point class_id_point;
         double max_class_score;
         cv::minMaxLoc(scores, 0, &max_class_score, 0, &class_id_point);
@@ -56,7 +61,7 @@ std::vector<Detection> Detector::runInference(cv::Mat& frame) {
             confidences.push_back(max_class_score);
             boxes.push_back(cv::Rect(left, top, width, height));
         }
-        data += 4 + (int)_classNames.size();
+        data += 4 + _numModelClasses;
     }
 
     std::vector<int> indices;
@@ -70,5 +75,21 @@ std::vector<Detection> Detector::runInference(cv::Mat& frame) {
         det.box = boxes[idx];
         final_detections.push_back(det);
     }
+
+    // Remap only if model has more classes than display names
+    // i.e. pretrained 10-class model remapped to 2-class display
+    if (_numModelClasses > (int)_classNames.size()) {
+        for (auto& det : final_detections) {
+            // pedestrian=0, people=1 → person=0
+            if (det.class_id == 0 || det.class_id == 1) {
+                det.class_id = 0;
+            }
+            // all vehicles → car=1
+            else {
+                det.class_id = 1;
+            }
+        }
+    }
+
     return final_detections;
 }

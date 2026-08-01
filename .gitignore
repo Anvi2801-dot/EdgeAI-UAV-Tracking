@@ -47,3 +47,23 @@ output.csv
 
 scripts/__pycache__/
 *.mp4
+
+# Model files
+*.engine
+yolov8n-visdrone.pt
+
+# UAVDT dataset
+uavdt_yolo/
+uavdt-2024-det/
+uavdt-2024/
+*.zip
+
+# Inference and sweep results
+scripts/infer_results/
+scripts/sweep_output/
+
+# HuggingFace cache
+.cache/
+
+# Virtual environments
+venv_visdrone/

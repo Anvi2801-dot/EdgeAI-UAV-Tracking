@@ -25,8 +25,12 @@ from ultralytics import YOLO
 VISDRONE_TO_COCO = {
     1: 0,   # pedestrian -> person
     2: 0,   # people -> person
-    4: 1,   # car -> car
-    5: 1,   # van -> car
+    3: 1,   # bicycle -> bicycle
+    4: 2,   # car -> car
+    5: 2,   # van -> car
+    6: 7,   # truck -> truck
+    9: 5,   # bus -> bus
+    10: 3,  # motor -> motorcycle
 }
 
 
@@ -110,6 +114,21 @@ def evaluate_sequence(model, dataset_path, seq_name, conf_threshold, iou_thresho
             cls_id = int(box.cls[0])
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             pred_boxes.append((cls_id, x1, y1, x2 - x1, y2 - y1))
+
+        # Remap pretrained VisDrone model class IDs to COCO IDs
+        PRETRAINED_TO_COCO = {
+            0: 0,   # pedestrian -> person
+            1: 0,   # people -> person
+            2: 1,   # bicycle -> bicycle
+            3: 2,   # car -> car
+            4: 2,   # van -> car
+            5: 7,   # truck -> truck
+            8: 5,   # bus -> bus
+            9: 3,   # motor -> motorcycle
+        }
+        pred_boxes = [(PRETRAINED_TO_COCO.get(cls, -1), x, y, w, h)
+                      for cls, x, y, w, h in pred_boxes
+                      if cls in PRETRAINED_TO_COCO]
 
         matched_gt = set()
         for pred_cls, px, py, pw, ph in pred_boxes:
