@@ -118,7 +118,7 @@ Detector detector("../models/best.onnx", "../models/best.names");
 
 ## Performance
 
-| Metric | Mac (M3 Pro) | Windows | Jetson (expected) |
+| Metric | Mac (M3 Pro) | Windows | Jetson |
 |---|---|---|---|
 | Inference | ~37–55ms | ~350ms | ~20–40ms |
 | FPS | 17–28 | 2 | 15–25 |
